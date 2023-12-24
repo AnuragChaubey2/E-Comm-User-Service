@@ -20,3 +20,8 @@ async def get_user_by_id(query):
         return user
     else:
         raise HTTPException(status_code=404, detail="User not found")
+    
+async def getAllUsers():
+    users_cursor = collection.find({})
+    users_list = list(users_cursor)
+    return users_list

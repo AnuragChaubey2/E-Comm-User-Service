@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, EmailStr, validator
 from fastapi import APIRouter, HTTPException
-from src.lib.users.index import get_user_by_id, save_user_to_mongo
+from src.lib.users.index import get_user_by_id, save_user_to_mongo, getAllUsers
 from passlib.hash import bcrypt
 import re
 from src.utils import generate_uuid
@@ -73,3 +73,12 @@ async def create_user(user: UsersCreate):
     response_data = {"user_id": str(result)}
 
     return response_data
+
+@router.get("/users", response_model=list[UsersBase])
+async def get_all_users():
+    users = await getAllUsers()
+
+    if users:
+        return users
+    else:
+        raise HTTPException(status_code=404, detail="No users found")
