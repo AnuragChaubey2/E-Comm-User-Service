@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, EmailStr, validator
 from fastapi import APIRouter, HTTPException
-from src.lib.users.index import get_user_by_id, save_user_to_mongo, getAllUsers
+from src.lib.users.index import get_user_by_id, save_user_to_mongo, getAllUsers, removeUser
 from passlib.hash import bcrypt
 import re
 from src.utils import generate_uuid
@@ -82,3 +82,11 @@ async def get_all_users():
         return users
     else:
         raise HTTPException(status_code=404, detail="No users found")
+    
+@router.delete("/users/{user_id}", response_model=dict)
+async def delete_user(user_id: str):
+    deleted_user = await removeUser({"user_id": user_id})
+    if deleted_user:
+        return {"message": "User deleted successfully"}
+    else:
+        raise HTTPException(status_code=404, detail="User not found")
