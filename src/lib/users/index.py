@@ -25,3 +25,7 @@ async def getAllUsers():
     users_cursor = collection.find({})
     users_list = list(users_cursor)
     return users_list
+
+async def removeUser(query):
+    result = collection.delete_one(query)
+    return result.deleted_count == 1
