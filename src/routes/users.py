@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException
 from src.lib.users.index import get_user_by_id, save_user_to_mongo, getAllUsers, removeUser
 from passlib.hash import bcrypt
 import re
+from typing import List
 from src.utils import generate_uuid
 
 router = APIRouter(redirect_slashes=False)
@@ -74,7 +75,7 @@ async def create_user(user: UsersCreate):
 
     return response_data
 
-@router.get("/users", response_model=list[UsersBase])
+@router.get("/users", response_model=List[UsersBase])
 async def get_all_users():
     users = await getAllUsers()
 
