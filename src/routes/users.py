@@ -1,6 +1,13 @@
 from pydantic import BaseModel, Field, EmailStr, validator
 from fastapi import APIRouter, HTTPException
-from src.lib.users.index import get_user_by_id, save_user_to_mongo, getAllUsers, removeUser
+from src.lib.users.index import (
+    get_user_by_id, 
+    save_user_to_mongo,
+    getAllUsers, 
+    removeUser,
+    get_user_by_email,
+    get_user_by_phone,
+)
 from passlib.hash import bcrypt
 import re
 from typing import List
@@ -68,6 +75,14 @@ async def create_user(user: UsersCreate):
         "address": user.address.dict(),
         "password": hashed_password,
     }
+
+    existing_email_user = await get_user_by_email(user.email)
+    if existing_email_user and existing_email_user["user_id"] != user_data["user_id"]:
+        raise HTTPException(status_code=422, detail="Email already exists")
+
+    existing_phone_user = await get_user_by_phone(user.phone_number)
+    if existing_phone_user and existing_phone_user["user_id"] != user_data["user_id"]:
+        raise HTTPException(status_code=422, detail="Phone number already exists")
 
     result = await save_user_to_mongo(user_data)
 
