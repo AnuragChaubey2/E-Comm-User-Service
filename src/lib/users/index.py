@@ -29,3 +29,11 @@ async def getAllUsers():
 async def removeUser(query):
     result = collection.delete_one(query)
     return result.deleted_count == 1
+
+async def get_user_by_email(email: str):
+    user = collection.find_one({"email": email}, {'_id': 0})
+    return user
+
+async def get_user_by_phone(phone: str):
+    user = collection.find_one({"phone_number": phone}, {'_id': 0})
+    return user
