@@ -1,57 +1,23 @@
-from pydantic import BaseModel, Field, EmailStr, validator
 from fastapi import APIRouter, HTTPException
+import logging
 from src.lib.users.index import (
     get_user_by_id, 
     save_user_to_mongo,
     getAllUsers, 
+    UpdatedUser,
     removeUser,
-    get_user_by_email,
-    get_user_by_phone,
 )
+from src.models.users import UsersBase, UsersCreate
+from service.user import check_duplicate_email_and_phone
 from passlib.hash import bcrypt
-import re
 from typing import List
 from src.utils import generate_uuid
 
 router = APIRouter(redirect_slashes=False)
 
-EMAIL_REGEX = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-PHONE_REGEX = r'^[6-9]\d{9}$'
-
-class Address(BaseModel):
-    street: str
-    city: str
-    state: str
-    zip_code: str
-    building_no: str = Field(default="")
-
-class UsersBase(BaseModel):
-    user_id: str
-    email: str
-    full_name: str
-    phone_number: str
-    date_of_birth: str
-    address: Address
-
-class UsersCreate(BaseModel):
-    email: EmailStr
-    full_name: str
-    phone_number: str
-    date_of_birth: str
-    address: Address
-    password: str
-
-    @validator("phone_number")
-    def validate_phone_number(cls, value):
-        if not re.match(PHONE_REGEX, value):
-            raise ValueError("Invalid phone number format")
-        return value
-
-    @validator("email")
-    def validate_email(cls, value):
-        if not re.match(EMAIL_REGEX, value):
-            raise ValueError("Invalid email address format")
-        return value
+logging.basicConfig(level=logging.INFO)
+    
+#-------------------------GetUsersByID-------------------------------------    
 
 @router.get("/users/{user_id}", response_model=UsersBase)
 async def get_user_by_id_endpoint(user_id: str):
@@ -61,6 +27,8 @@ async def get_user_by_id_endpoint(user_id: str):
     raise HTTPException(status_code=404, detail="User not found")
 
 user_router = router
+
+#-------------------------Create-------------------------------------
 
 @router.post("/users", response_model=dict)
 async def create_user(user: UsersCreate):
@@ -76,19 +44,44 @@ async def create_user(user: UsersCreate):
         "password": hashed_password,
     }
 
-    existing_email_user = await get_user_by_email(user.email)
-    if existing_email_user and existing_email_user["user_id"] != user_data["user_id"]:
-        raise HTTPException(status_code=422, detail="Email already exists")
-
-    existing_phone_user = await get_user_by_phone(user.phone_number)
-    if existing_phone_user and existing_phone_user["user_id"] != user_data["user_id"]:
-        raise HTTPException(status_code=422, detail="Phone number already exists")
+    await check_duplicate_email_and_phone(user, user_data)
 
     result = await save_user_to_mongo(user_data)
 
     response_data = {"user_id": str(result)}
 
     return response_data
+
+#-------------------------Update-------------------------------------
+
+@router.put("/users/{user_id}", response_model=UsersBase)   
+async def update_user(user_id: str, updated_user_data: UsersCreate):
+    existing_user = await get_user_by_id({"user_id": user_id})
+    if not existing_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    hashed_password = bcrypt.hash(updated_user_data.password)
+
+    user_data = {
+        "user_id": user_id,
+        "email": updated_user_data.email,
+        "full_name": updated_user_data.full_name,
+        "phone_number": updated_user_data.phone_number,
+        "date_of_birth": updated_user_data.date_of_birth,
+        "address": updated_user_data.address.dict(),
+        "password": hashed_password,
+    }
+
+    await check_duplicate_email_and_phone(updated_user_data, user_id)
+
+    result = await UpdatedUser(user_data)
+
+    if result:
+        return user_data
+    else:
+        raise HTTPException(status_code=500, detail="Failed to update user")
+    
+#-------------------------GetAll-------------------------------------    
 
 @router.get("/users", response_model=List[UsersBase])
 async def get_all_users():
@@ -99,10 +92,12 @@ async def get_all_users():
     else:
         raise HTTPException(status_code=404, detail="No users found")
     
+#-------------------------Delete------------------------------------- 
+    
 @router.delete("/users/{user_id}", response_model=dict)
 async def delete_user(user_id: str):
     deleted_user = await removeUser({"user_id": user_id})
     if deleted_user:
         return {"message": "User deleted successfully"}
     else:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="User not found") 
