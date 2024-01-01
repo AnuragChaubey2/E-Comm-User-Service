@@ -37,3 +37,7 @@ async def get_user_by_email(email: str):
 async def get_user_by_phone(phone: str):
     user = collection.find_one({"phone_number": phone}, {'_id': 0})
     return user
+
+async def UpdatedUser(updated_user_data: dict) -> bool:
+    result = collection.update_one({"user_id": updated_user_data["user_id"]}, {"$set": updated_user_data})
+    return result.modified_count > 0
