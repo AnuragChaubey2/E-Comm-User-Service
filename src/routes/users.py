@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 import logging
 from src.lib.users.index import (
     get_user_by_id, 
@@ -12,6 +12,7 @@ from service.user import check_duplicate_email_and_phone
 from passlib.hash import bcrypt
 from typing import List
 from src.utils import generate_uuid
+from src.middleware import basic_auth_middleware
 
 router = APIRouter(redirect_slashes=False)
 
@@ -19,8 +20,8 @@ logging.basicConfig(level=logging.INFO)
     
 #-------------------------GetUsersByID-------------------------------------    
 
-@router.get("/users/{user_id}", response_model=UsersBase)
-async def get_user_by_id_endpoint(user_id: str):
+@router.get("/users/{user_id}", response_model=UsersBase, dependencies=[Depends(basic_auth_middleware)])
+async def get_user_by_id_endpoint(user_id: str, user: dict = Depends(basic_auth_middleware)):
     user = await get_user_by_id({"user_id": user_id})
     if user:
         return user
@@ -30,8 +31,8 @@ user_router = router
 
 #-------------------------Create-------------------------------------
 
-@router.post("/users", response_model=dict)
-async def create_user(user: UsersCreate):
+@router.post("/users", response_model=dict, dependencies=[Depends(basic_auth_middleware)])
+async def create_user(user: UsersCreate, auth: dict = Depends(basic_auth_middleware)):
     hashed_password = bcrypt.hash(user.password)
     
     user_data = {
@@ -54,8 +55,8 @@ async def create_user(user: UsersCreate):
 
 #-------------------------Update-------------------------------------
 
-@router.put("/users/{user_id}", response_model=UsersBase)   
-async def update_user(user_id: str, updated_user_data: UsersCreate):
+@router.put("/users/{user_id}", response_model=UsersBase, dependencies=[Depends(basic_auth_middleware)])   
+async def update_user(user_id: str, updated_user_data: UsersCreate, auth: dict = Depends(basic_auth_middleware)):
     existing_user = await get_user_by_id({"user_id": user_id})
     if not existing_user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -83,8 +84,8 @@ async def update_user(user_id: str, updated_user_data: UsersCreate):
     
 #-------------------------GetAll-------------------------------------    
 
-@router.get("/users", response_model=List[UsersBase])
-async def get_all_users():
+@router.get("/users", response_model=List[UsersBase], dependencies=[Depends(basic_auth_middleware)])
+async def get_all_users(auth: dict = Depends(basic_auth_middleware)):
     users = await getAllUsers()
 
     if users:
@@ -94,10 +95,10 @@ async def get_all_users():
     
 #-------------------------Delete------------------------------------- 
     
-@router.delete("/users/{user_id}", response_model=dict)
-async def delete_user(user_id: str):
+@router.delete("/users/{user_id}", response_model=dict, dependencies=[Depends(basic_auth_middleware)])
+async def delete_user(user_id: str, auth: dict = Depends(basic_auth_middleware)):
     deleted_user = await removeUser({"user_id": user_id})
     if deleted_user:
         return {"message": "User deleted successfully"}
     else:
-        raise HTTPException(status_code=404, detail="User not found") 
+        raise HTTPException(status_code=404, detail="User not found")
